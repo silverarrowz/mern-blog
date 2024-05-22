@@ -7,10 +7,11 @@ const bcrypt = require("bcrypt");
 const app = express();
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
-const fs = require("fs");
-
 const multer = require("multer");
 const uploadMiddleware = multer({ dest: "uploads/" });
+
+const fs = require("fs");
+const path = require("path");
 
 const salt = bcrypt.genSaltSync(10);
 const secret = "fjodn78gdb76bfs87sbwh8dcd8f04fjwfd";
@@ -18,6 +19,7 @@ const secret = "fjodn78gdb76bfs87sbwh8dcd8f04fjwfd";
 app.use(cors({ credentials: true, origin: "http://localhost:5173" }));
 app.use(express.json());
 app.use(cookieParser());
+app.use("/uploads", express.static(__dirname + "/uploads"));
 
 mongoose
   .connect("mongodb://127.0.0.1:27017/mern-blog")
@@ -50,6 +52,8 @@ app.post("/login", async (req, res) => {
       res.cookie("token", token).json({
         id: userDoc._id,
         username,
+        avatar: userDoc.avatar,
+        about: userDoc.about,
       });
     });
   } else {
@@ -59,9 +63,77 @@ app.post("/login", async (req, res) => {
 
 app.get("/profile", (req, res) => {
   const { token } = req.cookies;
-  jwt.verify(token, secret, {}, (err, info) => {
+  jwt.verify(token, secret, {}, async (err, info) => {
+    if (err) return res.status(401).json("Unauthorized");
+
+    const userDoc = await User.findById(info.id);
+    if (!userDoc) return res.status(404).json("User not found");
+
+    res.json({
+      id: userDoc._id,
+      username: userDoc.username,
+      about: userDoc.about,
+      avatar: userDoc.avatar,
+    });
+  });
+});
+
+// Get another user's profile
+
+app.get("/profile/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const userDoc = await User.findById(id);
+  if (!userDoc) return res.status(404).json("User not found");
+
+  res.json({
+    id: userDoc._id,
+    username: userDoc.username,
+    about: userDoc.about,
+    avatar: userDoc.avatar,
+  });
+});
+
+// Update profile
+
+app.put("/profile", uploadMiddleware.single("file"), (req, res) => {
+  let newPath = null;
+  if (req.file) {
+    console.log(req.file);
+
+    const { originalname, path: filePath } = req.file;
+    const parts = originalname.split(".");
+    const ext = parts[parts.length - 1];
+    newPath = filePath + "." + ext;
+
+    fs.renameSync(filePath, newPath);
+  }
+
+  const { token } = req.cookies;
+  jwt.verify(token, secret, {}, async (err, info) => {
     if (err) throw err;
-    res.json(info);
+
+    const { username, about } = req.body;
+
+    const userDoc = await User.findById(info.id);
+
+    if (JSON.stringify(userDoc.id) !== JSON.stringify(info.id)) {
+      return res.status(400).json("Access denied");
+    }
+
+    userDoc.username = username;
+    userDoc.about = about;
+    userDoc.avatar = newPath ? newPath : userDoc.avatar;
+    console.log(req.body);
+    console.log(username, about);
+    const updatedUser = await userDoc.save();
+
+    res.json({
+      id: userDoc._id,
+      username: userDoc.username,
+      about: userDoc.about,
+      avatar: userDoc.avatar,
+    });
   });
 });
 
@@ -69,21 +141,29 @@ app.post("/logout", (req, res) => {
   res.cookie("token", "").json("ok");
 });
 
+// Creating post
+
 app.post("/post", uploadMiddleware.single("file"), async (req, res) => {
-  const { originalname, path } = req.file;
+  const { originalname, path: filePath } = req.file;
   const parts = originalname.split(".");
   const ext = parts[parts.length - 1];
-  const newPath = path + "." + ext;
-  fs.renameSync(path, newPath);
+  const newPath = filePath + "." + ext;
 
-  const { title, summary, content } = req.body;
+  fs.renameSync(filePath, newPath);
 
-  const postDoc = await Post.create({
-    title,
-    summary,
-    content,
-    cover: newPath,
-  });
+  const { token } = req.cookies;
+
+  jwt.verify(token, secret, {}, async (err, info) => {
+    if (err) throw err;
+
+    const { title, summary, content } = req.body;
+    const postDoc = await Post.create({
+      title,
+      summary,
+      content,
+      cover: newPath,
+      author: info.id,
+    });
 
     res.json(postDoc);
   });
@@ -145,6 +225,22 @@ app.get("/post/:id", async (req, res) => {
   ]);
 
   res.json(postDoc);
+});
+
+// Delete post
+
+app.delete("/post/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const postDoc = await Post.findById(id);
+
+    await Post.deleteOne(postDoc);
+
+    res.status(200).send("Post deleted successfully");
+  } catch (error) {
+    res.status(500).send("Server error");
+  }
 });
 
 app.listen(4000);
