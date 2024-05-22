@@ -85,6 +85,65 @@ app.post("/post", uploadMiddleware.single("file"), async (req, res) => {
     cover: newPath,
   });
 
+    res.json(postDoc);
+  });
+});
+
+// Updating post
+
+app.put("/post", uploadMiddleware.single("file"), async (req, res) => {
+  let newPath = null;
+  if (req.file) {
+    const { originalname, path: filePath } = req.file;
+    const parts = originalname.split(".");
+    const ext = parts[parts.length - 1];
+    newPath = filePath + "." + ext;
+
+    fs.renameSync(filePath, newPath);
+  }
+
+  const { token } = req.cookies;
+
+  jwt.verify(token, secret, {}, async (err, info) => {
+    if (err) throw err;
+
+    const { id, title, summary, content } = req.body;
+    const postDoc = await Post.findById(id);
+    const isAuthor = JSON.stringify(postDoc.author) === JSON.stringify(info.id);
+    if (!isAuthor) {
+      return res.status(400).json("you are not the author");
+    }
+
+    await postDoc.updateOne({
+      title,
+      summary,
+      content,
+      cover: newPath ? newPath : postDoc.cover,
+    });
+    res.json(postDoc);
+  });
+});
+
+// Get all posts
+
+app.get("/post", async (req, res) => {
+  res.json(
+    await Post.find()
+      .populate("author", ["username"])
+      .sort({ createdAt: -1 })
+      .limit(20)
+  );
+});
+
+// Get a selected post
+
+app.get("/post/:id", async (req, res) => {
+  const { id } = req.params;
+  const postDoc = await Post.findById(id).populate("author", [
+    "username",
+    "avatar",
+  ]);
+
   res.json(postDoc);
 });
 
