@@ -11,6 +11,7 @@
     "mongoose": "^8.3.5",
     "multer": "^1.4.5-lts.1",
     "react-router-dom": "^6.23.1",
-    "sort-by": "^1.2.0"
+    "sort-by": "^1.2.0",
+    "validator": "^13.12.0"
   }
 }

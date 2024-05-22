@@ -1,22 +1,27 @@
-import picture from "../images/2.jpg";
+import { format } from "date-fns";
+import { Link } from "react-router-dom";
 
-const Post = () => {
+const Post = ({ _id, cover, title, summary, author, createdAt }) => {
   return (
     <div className="post">
-      <img src={picture} alt="" />
+      <Link className="post__img-container" to={`/post/${_id}`}>
+        <img
+          className="post__img"
+          src={`http://localhost:4000/${cover}`}
+          alt=""
+        />
+      </Link>
       <div className="texts">
-        <h2>Lorem ipsum dolor sit amet consectetur</h2>
+        <Link to={`/post/${_id}`}>
+          <h2 className="post__title">{title}</h2>
+        </Link>
         <p className="info">
-          <a href="" className="author">
-            Diana K.
-          </a>
-          <time>18-05-2024 15:31</time>
+          <Link to={`/profile/${author._id}`} className="author">
+            {author.username}
+          </Link>
+          <time>{format(new Date(createdAt), "MMM d, yyyy HH:mm")}</time>
         </p>
-        <p className="summary">
-          Lorem, ipsum dolor sit amet consectetur adipisicing elit. Expedita
-          possimus ea cum, soluta at nulla eum obcaecati, minus eveniet optio
-          aperiam, officiis adipisci vero fuga.
-        </p>
+        <p className="summary">{summary}</p>
       </div>
     </div>
   );

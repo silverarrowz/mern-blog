@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { UserContext } from "../UserContext";
 
 const Header = () => {
@@ -14,12 +14,16 @@ const Header = () => {
     });
   }, []);
 
+  const navigate = useNavigate();
+
   function logout() {
     fetch("http://localhost:4000/logout", {
       credentials: "include",
       method: "POST",
+    }).then(() => {
+      setUserInfo(null);
+      navigate("/");
     });
-    setUserInfo(null);
   }
 
   const username = userInfo?.username;
@@ -32,6 +36,7 @@ const Header = () => {
       <nav>
         {username && (
           <>
+            <Link to={`/profile/${userInfo.id}`}>My profile</Link>
             <Link to="/create">Create new post</Link>
             <a onClick={logout}>Logout</a>
           </>
